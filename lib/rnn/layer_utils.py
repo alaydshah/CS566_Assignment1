@@ -1,4 +1,5 @@
 import numpy as np
+import copy
 
 
 def sigmoid(x):
@@ -132,7 +133,9 @@ class VanillaRNN(object):
         # Store the results in the variable output provided above as well as       #
         # values needed for the backward pass.                                     #
         ############################################################################
-        pass
+        z = x.dot(self.params[self.wx_name]) + prev_h.dot(self.params[self.wh_name]) + self.params[self.b_name]
+        next_h = np.tanh(z)
+        meta = (x, prev_h, next_h)
         #############################################################################
         #                             END OF YOUR CODE                              #
         #############################################################################
@@ -155,7 +158,18 @@ class VanillaRNN(object):
         # Store the computed gradients for current layer in self.grads with         #
         # corresponding name.                                                       # 
         #############################################################################
-        pass
+        # dnext_h = batch_size x hidden_dim
+        # self.wx_name = input_dim x hidden_dim
+        # self.wh_name = hidden_dim x hidden_dim
+        # x = batch_size x input_dim
+        # prev_h = batch_size x hidden_dim
+        x, prev_h, next_h = meta
+        dz = dnext_h * (1 - np.power(next_h, 2))
+        dx = dz.dot(self.params[self.wx_name].T)
+        dprev_h = dz.dot(self.params[self.wh_name].T)
+        dWx = x.T.dot(dz)
+        dWh = prev_h.T.dot(dz)
+        db = np.sum(dz, axis=0)
         #############################################################################
         #                             END OF YOUR CODE                              #
         #############################################################################
@@ -173,7 +187,13 @@ class VanillaRNN(object):
         # input data. You should use the step_forward function that you defined      #
         # above. You can use a for loop to help compute the forward pass.            #
         ##############################################################################
-        pass
+        h = [h0]
+        for i in range(x.shape[1]):
+            word_timestamp = x[:,i,:]
+            next_h, meta = self.step_forward(word_timestamp, h[-1])
+            h.append(next_h)
+            self.meta.append(meta)
+        h = np.stack(tuple(h[1:]), axis=1)
         ##############################################################################
         #                               END OF YOUR CODE                             #
         ##############################################################################
@@ -199,7 +219,23 @@ class VanillaRNN(object):
         # defined above. You can use a for loop to help compute the backward pass.   #
         # HINT: Gradients of hidden states come from two sources                     #
         ##############################################################################
-        pass
+        dnext_h = None
+        dx = []
+
+        for i in range(dh.shape[1]-1, -1, -1):          
+            hidden_delta = copy.deepcopy(dh[:,i,:])
+
+            if dnext_h is not None:
+                hidden_delta += dnext_h
+            dx_temp, dprev_h, dWx_temp, dWh_temp, db_temp = self.step_backward(hidden_delta, self.meta[i]) 
+            dx.insert(0, dx_temp)
+            self.grads[self.wx_name] = dWx_temp if self.grads[self.wx_name] is None else self.grads[self.wx_name] + dWx_temp
+            self.grads[self.wh_name] = dWh_temp if self.grads[self.wh_name] is None else self.grads[self.wh_name] + dWh_temp            
+            self.grads[self.b_name] = db_temp if self.grads[self.b_name] is None else self.grads[self.b_name] + db_temp
+            dnext_h = dprev_h
+
+        dh0 = dnext_h
+        dx = np.stack(tuple(dx), axis=1) if len(dx) else None
         ##############################################################################
         #                               END OF YOUR CODE                             #
         ##############################################################################
@@ -245,7 +281,13 @@ class LSTM(object):
         # TODO: Implement the forward pass for a single timestep of an LSTM.        #
         # You may want to use the numerically stable sigmoid implementation above.  #
         #############################################################################
-        pass
+        z = x.dot(self.params[self.wx_name]) + prev_h.dot(self.params[self.wh_name]) + self.params[self.b_name]
+        i = sigmoid(z[:, :self.h_dim])
+        f = sigmoid(z[:, self.h_dim : self.h_dim * 2])
+        o = sigmoid(z[:, self.h_dim * 2 : self.h_dim * 3])
+        g = np.tanh(z[:, (self.h_dim * 3):])
+        next_c = np.multiply(f, prev_c) + np.multiply(i,g)
+        next_h = np.multiply(o, np.tanh(next_c))
         #############################################################################
         #                               END OF YOUR CODE                            #
         #############################################################################
@@ -384,7 +426,8 @@ class word_embedding(object):
         #                                                                            #
         # HINT: This can be done in one line using NumPy's array indexing.           #
         ##############################################################################
-        pass
+        out = self.params[self.w_name][x]
+        self.meta = x
         ##############################################################################
         #                               END OF YOUR CODE                             #
         ##############################################################################
@@ -410,7 +453,8 @@ class word_embedding(object):
         # Note that Words can appear more than once in a sequence.                   #
         # HINT: Look up the function np.add.at                                       #
         ##############################################################################
-        pass
+        self.grads[self.w_name] = np.zeros_like(self.params[self.w_name])
+        np.add.at(self.grads[self.w_name], self.meta, dout)
         ##############################################################################
         #                               END OF YOUR CODE                             #
         ##############################################################################

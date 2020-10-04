@@ -2,3 +2,4 @@
 .ipynb_checkpoints
 data/cifar-10*
 *__pycache__
+.vscode/
