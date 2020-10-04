@@ -56,7 +56,12 @@ class SGDM(Optimizer):
         #############################################################################
         # TODO: Implement the SGD + Momentum                                        #
         #############################################################################
-        pass
+        for n, dv in layer.grads.items():
+            if n in self.velocity:
+                self.velocity[n] = self.momentum * self.velocity[n] - self.lr * dv
+            else:
+                self.velocity[n] = - self.lr * dv
+            layer.params[n] += self.velocity[n]
         #############################################################################
         #                             END OF YOUR CODE                              #
         #############################################################################
@@ -75,6 +80,13 @@ class RMSProp(Optimizer):
         #############################################################################
         # TODO: Implement the RMSProp                                               #
         #############################################################################
+        for n, dv in layer.grads.items():
+            if n in self.cache:
+                self.cache[n] = self.decay * self.cache[n] + (1-self.decay) * (dv ** 2)
+            else:
+                self.cache[n] = (1-self.decay) * (dv ** 2)
+            layer.params[n] -= self.lr * dv / np.sqrt(self.cache[n] + self.eps)
+
         pass
         #############################################################################
         #                             END OF YOUR CODE                              #
@@ -96,7 +108,13 @@ class Adam(Optimizer):
         #############################################################################
         # TODO: Implement the Adam                                                  #
         #############################################################################
-        pass
+        for n, dv in layer.grads.items():
+            self.t += 1
+            self.mt[n] = self.beta1 * (self.mt[n] if n in self.mt else 0) + (1-self.beta1) * dv
+            self.vt[n] = self.beta2 * (self.vt[n] if n in self.vt else 0) + (1-self.beta2) * (dv ** 2)
+            mt_norm = self.mt[n] / (1-np.power(self.beta1, self.t))
+            vt_norm = self.vt[n] / (1-np.power(self.beta2, self.t))
+            layer.params[n] -= self.lr * mt_norm / (np.sqrt(vt_norm) + self.eps)
         #############################################################################
         #                             END OF YOUR CODE                              #
         #############################################################################

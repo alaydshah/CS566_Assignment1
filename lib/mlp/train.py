@@ -1,7 +1,7 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
-
+import copy
 from lib.mlp.layer_utils import *
 from lib.optim import *
 
@@ -149,7 +149,12 @@ def train_net(data, model, loss_func, optimizer, batch_size, max_epochs,
             # pass to the network, and make a step for the optimizer.                   #
             # Store the loss to loss_hist                                               #
             #############################################################################
-            pass
+            output = model.forward(data_batch)
+            loss = loss_func.forward(output, labels_batch)
+            dLoss = loss_func.backward()
+            model.backward(dLoss)
+            optimizer.step()
+            loss_hist.append(loss)
             #############################################################################
             #                             END OF YOUR CODE                              #
             #############################################################################
@@ -166,7 +171,8 @@ def train_net(data, model, loss_func, optimizer, batch_size, max_epochs,
         # compute_acc method, store the results to train_acc and val_acc,           #
         # respectively                                                              #
         #############################################################################
-        pass
+        train_acc = compute_acc(model, data_train, labels_train)
+        val_acc = compute_acc(model, data_val, labels_val)
         #############################################################################
         #                             END OF YOUR CODE                              #
         #############################################################################
@@ -179,7 +185,8 @@ def train_net(data, model, loss_func, optimizer, batch_size, max_epochs,
             # TODO: Save the optimal parameters to opt_params variable by name using    #
             # model.net.gather_params method                                            #
             #############################################################################
-            pass
+            model.net.gather_params()
+            opt_params = copy.deepcopy(model.net.params)
             #############################################################################
             #                             END OF YOUR CODE                              #
             #############################################################################
