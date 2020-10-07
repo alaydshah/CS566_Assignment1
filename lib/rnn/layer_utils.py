@@ -224,7 +224,6 @@ class VanillaRNN(object):
 
         for i in range(dh.shape[1]-1, -1, -1):          
             hidden_delta = copy.deepcopy(dh[:,i,:])
-
             if dnext_h is not None:
                 hidden_delta += dnext_h
             dx_temp, dprev_h, dWx_temp, dWh_temp, db_temp = self.step_backward(hidden_delta, self.meta[i]) 
@@ -286,8 +285,10 @@ class LSTM(object):
         f = sigmoid(z[:, self.h_dim : self.h_dim * 2])
         o = sigmoid(z[:, self.h_dim * 2 : self.h_dim * 3])
         g = np.tanh(z[:, (self.h_dim * 3):])
-        next_c = np.multiply(f, prev_c) + np.multiply(i,g)
-        next_h = np.multiply(o, np.tanh(next_c))
+        next_c = f * prev_c + i * g
+        next_h = o * np.tanh(next_c)
+        # meta = (copy.deepcopy(x), copy.deepcopy(prev_h), copy.deepcopy(prev_c), copy.deepcopy(i), copy.deepcopy(f), copy.deepcopy(o), copy.deepcopy(g), copy.deepcopy(next_c))
+        meta = (x, prev_h, prev_c, i, f, o, g, next_c)
         #############################################################################
         #                               END OF YOUR CODE                            #
         #############################################################################
@@ -311,7 +312,25 @@ class LSTM(object):
         # HINT: For sigmoid and tanh you can compute local derivatives in terms of  #
         # the output value of the nonlinearity.                                   #
         #############################################################################
-        pass
+        x, prev_h, prev_c, i, f, o, g, next_c = meta
+
+        ### Derivatives
+        dsigmoid = lambda output : output * (1 - output)
+        dtanh = lambda output : 1 - np.power(output, 2)
+
+        do = dnext_h * np.tanh(next_c) * dsigmoid(o)
+        dc = (dnext_h * o * dtanh(np.tanh(next_c))) + dnext_c
+        dprev_c = dc * f
+        df = dc * prev_c * dsigmoid(f)
+        di = dc * g * dsigmoid(i)
+        dg = dc * i * (1 - np.power(g, 2))
+
+        dz = np.concatenate((di, df, do, dg), axis=1)
+        dx = dz.dot(self.params[self.wx_name].T)
+        dWx = x.T.dot(dz)
+        dprev_h = dz.dot(self.params[self.wh_name].T)
+        dWh = prev_h.T.dot(dz)
+        db = np.sum(dz, axis=0)
         #############################################################################
         #                               END OF YOUR CODE                            #
         #############################################################################
@@ -349,7 +368,16 @@ class LSTM(object):
         # You should use the lstm_step_forward function that you just defined.      #
         # HINT: The initial cell state c0 should be set to zero.                    #
         #############################################################################
-        pass
+        next_c = 0
+        h = [h0]
+
+        for i in range(x.shape[1]):
+            word_timestamp = x[:,i,:]
+            next_h, next_c, meta = self.step_forward(word_timestamp, h[-1], next_c)
+            h.append(next_h)
+            self.meta.append(meta)
+
+        h = np.stack(tuple(h[1:]), axis=1)
         #############################################################################
         #                               END OF YOUR CODE                            #
         #############################################################################
@@ -376,7 +404,23 @@ class LSTM(object):
         # HINT: Again note that gradients of hidden states h come from two sources  #
         # HINT: The initial gradient of the cell state is zero.
         #############################################################################
-        pass
+        dnext_h = None
+        dnext_c = 0
+        dx = []
+
+        for i in range(dh.shape[1]-1, -1, -1):
+            hidden_delta = copy.deepcopy(dh[:,i,:])
+            if dnext_h is not None:
+                hidden_delta += dnext_h
+            dx_temp, dprev_h, dprev_c, dWx_temp, dWh_temp, db_temp = self.step_backward(hidden_delta, dnext_c, self.meta[i])
+            dx.insert(0, dx_temp)
+            self.grads[self.wx_name] = dWx_temp if self.grads[self.wx_name] is None else self.grads[self.wx_name] + dWx_temp
+            self.grads[self.wh_name] = dWh_temp if self.grads[self.wh_name] is None else self.grads[self.wh_name] + dWh_temp            
+            self.grads[self.b_name] = db_temp if self.grads[self.b_name] is None else self.grads[self.b_name] + db_temp
+            dnext_h, dnext_c = dprev_h, dprev_c
+
+        dh0 = dnext_h
+        dx = np.stack(tuple(dx), axis=1) if len(dx) else None        
         #############################################################################
         #                               END OF YOUR CODE                            #
         #############################################################################

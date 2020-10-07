@@ -11,7 +11,10 @@ class TestRNN(object):
         #####################################################################################
         # TODO: Modify the constructor to handle both cell_type='rnn' and cell_type='lstm'. #
         #####################################################################################
-        self.rnn = VanillaRNN(input_dim, hidden_dim)
+        if cell_type == 'rnn':
+            self.rnn = VanillaRNN(input_dim, hidden_dim)
+        elif cell_type == 'lstm':
+            self.rnn = LSTM(input_dim, hidden_dim)
         #####################################################################################
         #                                  END OF YOUR CODE                                 #
         #####################################################################################
@@ -57,7 +60,14 @@ class LanguageModelRNN(object):
         # TODO: Modify the constructor to handle both cell_type='rnn' and cell_type='lstm'. #
         # TODO: Add word-embedding and fully-connected layer for pre- and post-processing.  #
         #####################################################################################
-        pass
+
+        if self.cell_type == 'rnn':
+            self.rnn = VanillaRNN(self.word_vec_dim, self.hidden_dim)
+        elif self.cell_type == 'lstm':
+            self.rnn = LSTM(self.word_vec_dim, self.hidden_dim)
+
+        self.preprocess = word_embedding(self.word_size, self.word_vec_dim)
+        self.postprocess = temporal_fc(self.hidden_dim, self.word_size)
         #####################################################################################
         #                                  END OF YOUR CODE                                 #
         #####################################################################################
